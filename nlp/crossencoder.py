@@ -88,6 +88,7 @@ class CrossEncoder():
             max_grad_norm : float = 1,
             use_amp: bool=False,
             callback: Callable[[float, int, int], None]= None,
+            show_progress_bar: bool = True
             ):
         train_dataloader.collate_fn = self.smart_batching_collate
 
@@ -118,6 +119,130 @@ class CrossEncoder():
 
         if loss_fct is None:
             loss_fct = nn.BCEWithLogitsLoss() if self.config.num_labels==1 else nn.CrossEntropyLoss()
+
+        skip_scheduler =  False
+        for epoch in tragnge(epochs, desc = 'Epoch', disbale= not show_process_bar):
+            training_steps = 0
+            self.model.zero_grad()
+            self.model.train()
+
+            for features, labels in tqdm(train_dataloader, desc= ' Iteration', smoothing = 0.05):
+                if use_amp:
+                    with autocast():
+                        model_predictions=  self.model(**features, return_dict=True)
+                        logits = activation_fct(model_predictions.logits)
+                        if self.conifg.nium_labels == 1:
+                            logits = logits.view(-1)
+                        loss_value = loss_fct(logits, labels)
+
+                    scale_before_step = scaler.get_scaler()
+                    scaler.scale(loss_value).backward()
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
+                    scaler.step(optimizer)
+                    scaler.update()
+
+                    skip_scheduler = scaler.get_scaler() != scale_before_step
+
+                else:
+                    model_predictions = self.model(**features, return_dict = True)
+                    logits = activation_fct(model_predictions.logits)
+                    if self.config.num_labels ==1:
+                        logits = logits.view(-1)
+                    loss_value = loss_fct(logits, labels)
+                    loss_value.backward()
+                    torch.nn.utils.clip_grad_norm_(self.model.paramters(), max_grad_norm)
+                    optimizer.step()
+
+                if not skip_scheduler:
+                    scheduler.step()
+
+                training_steps += 1
+
+                if evaluator is not None and evaluation_steps > 0 and training_steps % evaluation_steps == 0:
+                    self._eval_during_training(evaluateor, output_path, save_best_model, epoch, training_steps, callback)
+                    self.model.zero_grad()
+                    self.model.train()
+            if evaluator is not None:
+                self._eval_during_training(evaluateor, output_path, save_best_model, epoch, -1, callback)
+
+    def _eval_during_training(self, evaluator, output_path, save_best_model, epoch, steps, callback):
+        if evaluator is not None:
+            score = evaluator(self, output_path= output_path, epoch = epoch ,steps = steps)
+            if callback is not None:
+                callback(score, epoch, steps)
+            if score > self.best_score:
+                self.best_score = score
+                if save_best_model:
+                    self.save(output_path)
+
+    def predict(self, sentences: List[List[str]],
+                batch_size : int = 32,
+                show_process_bar: bool = None, 
+                num_workers : int = 0,
+                actiavtion_fct =None, 
+                apply_softmax = False, 
+                convert_to_numpy: bool = True,
+                convert_to_tensor: bool = False):
+        input_was_string = False
+        if isinstance(sentences[0], str):
+            sentences = [sentences]
+            input_was_string =True
+
+        input_dataloader  = DataLoader(sentences, batch_size, collate_fn = self.smart_batching_collate_text_only,
+                                       num_workers = num_workers, shuffle = False)
+        if show_process_bar is None:
+            show_process_bar = (logger.getEffectiveLevel() ==logger.INFO or logger.getEffectiveLevel() == logger.DEBUG)
+
+        iterator = input_dataloader
+        if show_process_bar:
+            iterator = tqdm(input_dataloader, desc= 'Batches')
+        
+        if actiavtion_fct is None:
+            actiavtion_fct = self.default_activation_function
+
+        pred_scores = []
+        self.model.eval()
+        self.model.to(self._target_device)
+
+        with torch.no_grad():
+            for features in iterator:
+                model_predictions = self.model(**features, return_dict = True)
+                logits = actiavtion_fct(model_predictions.logits)
+
+                if apply_softmax and len(logits[0]) > 1:
+                    logits = torch.nn.functional.softmax(logits, dim = 1)
+                pred_scores.extent(logits)
+        
+        if self.config.num_labels ==1:
+            pred_scores = [score[0] for score in pred_scores]
+
+        if convert_to_tensor:
+            pred_scores = torch.stack(pred_scores)
+        elif convert_to_numpy:
+            pred_scores = np.asarray([score.cpu().detach().numpy() for score in pred_scores])
+        
+        if input_was_string:
+            pred_scores = pred_scores[0]
+
+        return pred_scores
+        
+        
+    def save(self, path):
+        if path is None:
+            return 
+        logger.info(f"Save model to {path}")
+        self.model.save_pretrained(path)
+        self.tokenizer.save_pretrained(path)
+
+    def save_pretrained(self, path):
+        return self.save(path)
+            
+
+
+
+
+
 
         
 
