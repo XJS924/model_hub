@@ -3,6 +3,10 @@ from torch import nn
 from typing import List
 import os
 import json
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class LSTM(nn.module):
 
