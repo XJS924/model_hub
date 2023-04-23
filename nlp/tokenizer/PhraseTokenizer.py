@@ -60,8 +60,39 @@ class PhraseTokenizer(WordTokenizer):
                 idx += 1
         
         tokens_filtered = []
-        for token
+        for token in tokens:
+            if token in self.stop_words:
+                continue
+            elif token in self.word2idx:
+                tokens_filtered.append(self.word2idx[token])
+                continue
 
+            token = token.lower()
+            if token in self.stop_words:
+                continue
+            elif token in self.word2idx:
+                tokens_filtered.append(self.word2idx[token])
+                continue
 
+            token = token.strip(string.punctuation)
+            if token in self.stop_words:
+                continue
+            elif len(token) > 0 and token in self.word2idx:
+                tokens_filtered.append(self.word2idx[token])
+                continue
+        return tokens_filtered
+    
+    def save(self, output_path: str):
+        with open(os.path.join(output_path, 'phrasetokenizer_config.json'), 'w') as fOut:
+            json.dump({'vocab':list(self.word2idx.keys()),"stop_words":list(self.stop_words),
+                       "do_lower_case":self.do_lower_case, 'ngram_separator':self.ngram_separator,
+                       'max_ngram_length':self.max_ngram_length},fOut)
+
+    @staticmethod
+    def load(input_path: str):
+        with open(os.path.join(input_path, 'phrasetokenizer_config.json'), 'r') as fIn:
+            config = json.load(fIn)
+        
+        return PhraseTokenizer(**config)
 
     
