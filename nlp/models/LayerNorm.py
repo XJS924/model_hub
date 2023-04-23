@@ -30,7 +30,7 @@ class LayerNorm(nn.Module):
     def load(input_path):
         with open(os.path.join(input_path, 'config.json')) as fIn:
             config = json.load(fIn)
-        model = LayerNorm(*8config)
+        model = LayerNorm(**config)
         model.load_state_dict(torch.load(os.path.join(input_path, 'pytorch_model.bin'), map_location=torch.device('cpu')))
         return model
     
