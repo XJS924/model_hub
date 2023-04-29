@@ -57,7 +57,4 @@ class WhitespaceTokenizer(WordTokenizer):
             with open(os.path.join(input_path, 'whitespacetokenizer_config.json'),'r') as fIn:
                 config = json.load(fIn)
 
-            return WhitespaceTokenizer(**config)
-
-
-        
+            return WhitespaceTokenizer(**config)        
