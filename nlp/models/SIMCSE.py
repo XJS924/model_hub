@@ -92,6 +92,7 @@ class Pooler(nn.Module):
                     return_dict = None,
                     mlp_input_ids = None, 
                     mlm_labels = None):
+        pass
         
 
 
