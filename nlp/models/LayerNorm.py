@@ -13,7 +13,7 @@ class LayerNorm(nn.Module):
         self.dimension = dimension
         self.norm = nn.LayerNorm(dimension)
 
-    def forward(self, features :dict[str, Tensor]):
+    def forward(self, features:Dict[str, Tensor]):
         features['sentence_embeddings'] = self.norm(features['sentence_embedding'])
         return features
     
