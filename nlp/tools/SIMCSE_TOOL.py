@@ -274,8 +274,3 @@ if __name__=="__main__":
         for sentence, score in result:
             print(f' {sentence} (cosin similarity :{score:.4f})')
         print("")
-
-
-
-
-
