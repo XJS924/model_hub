@@ -464,9 +464,61 @@ def main():
 
             return inputs, labels
         
-        data_collator = default_data_collator  if data_args.pad_to_max_length else OurDataCollatorWithPadding(tokenizer)
+    data_collator = default_data_collator  if data_args.pad_to_max_length else OurDataCollatorWithPadding(tokenizer)
 
-        trainer  = CLTrainer(
-            model =model, 
-            args  = training_args,
+    trainer  = CLTrainer(
+        model =model, 
+        args  = training_args,
+        train_dataset = train_dataset if training_args.do_train else None,
+        tokenizer = tokenizer,
+        data_collator = data_collator,
+    )
+
+    trainer.model_args = model_args
+
+    #Training 
+    if training_args.do_train:
+        model_path = (
+            model_args.model_name_or_path
+            if (model_args.model_name_or_path is not None and os.path.isdir(model_args.model_naem_or_path))
+            else None
         )
+        train_result = trainer.train(model_path = model_path)
+        trainer.save_model()
+
+        output_train_file = os.path.join(trianing_args.output_dir, "train_results.txt")
+        if trainer.is_world_process_zero():
+            with open(output_train_file, 'w') as writer:
+                logger.info("******* Train results ****")
+                for key, value in sorted(train_result.metrics.items()):
+                    logger.info(f"  {key} = {value}")
+                    writer.write(f'{key} = {value}\n')
+
+            trainer.state.save_to_json(os.path.join(trianing_args.output_dir, "trainer_state.json"))
+
+    results = {}
+    if training_args.do_eval:
+        logger.info("*** Evaluate ***")
+        results = trainer.evaluate(eval_senteval_trainsfer=True)
+
+        ouput_eval_file = os.path.join(trianing_args.output_dir, "eval_results.txt")
+
+        if trainer.is_world_process_zero():
+            with open(output_eval_file, 'w') as writer:
+                logger.info("*** Eval results ***")    
+                for key ,value in sorted(results.items()):
+                    logger.info(f" {key} = {value}")
+                    writer.write(f"{key} = {value}\n")
+    return results
+
+def _mp_fn(index):
+    main()
+
+
+if __name__ == '__main__':
+    main()
+
+
+        
+
+
