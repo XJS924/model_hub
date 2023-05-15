@@ -35,7 +35,7 @@ from transformers import (
 from transformers.tokenization_utils_base import BatchEncoding, PaddingStrategy, PreTrainedTokenizerbase
 from transformers.trainer_utils import is_main_process
 from transformers.data.data_collator import DataCollatorForLanguageModeling
-from transformers.fuile_utils import cached_property , torch_required, is_torch_available, is_torch_tpu_available
+from transformers.file_utils import cache_property , torch_required, is_torch_available, is_torch_tpu_available
 from models.SIMCSE import RobertaForCL, BertForCL
 from trainers.simcse_trainer import CLTrainer
 
@@ -121,12 +121,12 @@ class ModelArguments:
 
     mlm_weight: float=field(
         default=0.1,
-        metadata=(
+        metadata={
             'help':'weight for mlm auxiliary objective only effective if --do_mlm'
-        )
+        }
     )
 
-    mlp_only_train : bool = (
+    mlp_only_train : bool = field(
         default=False,
         metadata={
             'help':'Use MLP only druing training'
@@ -140,7 +140,7 @@ class DataTrainingArguments:
         default = None, metadata = {'help':"the name of the dataset to use (via the datasets library)"}
     )
 
-    dataset_config_name: Optional[str]=filed(
+    dataset_config_name: Optional[str]=field(
         default=None, metadata={'help':"The configuratin name of the dataset"}
     )
 
@@ -185,7 +185,7 @@ class DataTrainingArguments:
                 assert extension in ['csv' ,'json', 'txt'] , "`trian_file` should be a csv, a json or a txt file."
 
 @dataclass
-class OurTrainingAugments(TrainingAugments):
+class OurTrainingArguments(TrainingArguments):
 
     eval_transfer:  bool =field(
         default=None, metadata={'help':"Evaluation transfer taks dev sets (in validation)"}
@@ -259,7 +259,7 @@ def main():
 
     data_files = {}
     if data_args.train_file is not None:
-        data_files['train'] = data_argas.train_file
+        data_files['train'] = data_args.train_file
     extension = data_args.train_file.split('.')[-1]
     if extension == 'txt':
         extension = 'text'
@@ -305,7 +305,7 @@ def main():
                 model_args.model_name_or_path,
                 from_tf = bool('.ckpt' in model_args.model_name_or_path),
                 config= config,
-                cache_dir = cache_dir,
+                cache_dir = model_args.cache_dir,
                 revision = model_args.model_revision,
                 use_auth_token = True if model_args.use_auth_token else None,
                 model_args = model_args
@@ -315,7 +315,7 @@ def main():
                 model_args.model_name_or_path,
                 from_tf = bool('.ckpt' in model_args.model_name_or_path),
                 config= config,
-                cache_dir = cache_dir,
+                cache_dir = model_args.cache_dir,
                 revision = model_args.model_revision,
                 use_auth_token = True if model_args.use_auth_token else None,
                 model_args = model_args
@@ -388,7 +388,7 @@ def main():
             prepare_features,
             batch = True,
             num_proc  = data_args.preprocessing_num_workers,
-            remove_columns = columns_name,
+            remove_columns = data_args.columns_name,
             load_from_cache_file = not data_args.overwrite_cache,
         )
 
@@ -396,7 +396,7 @@ def main():
     @dataclass
     class OurDataCollatorWithPadding:
 
-        tokenizer: PreTrainedTokenizerBase
+        tokenizer: PreTrainedTokenizerbase
         padding: Union[bool, str, PaddingStrategy] = True
         max_length: Optional[int] = None
         pad_to_multiple_of : Optional[int] = None
@@ -415,12 +415,12 @@ def main():
 
             for feature in features:
                 for i in range(num_sent):
-                    flat_features.append({k: features[k][i] for k in special_keys else feature[k] for k in feature})
+                    flat_features.append({k: features[k][i] if k in special_keys else feature[k] for k in feature})
 
             
             batch = self.tokenizer.pad(
                 flat_features,
-                paddding = slef.padding,
+                paddding = self.padding,
                 max_length = self.max_length,
                 pad_to_multiple_of = self.pad_to_multiple_of,
                 return_tensors = "pt",
@@ -440,14 +440,14 @@ def main():
             
             return batch
         
-        def mask_tokens(self, inputs: torch.Tensor, special_token_mask:Optional[torch.Tensor] =None) -> Tupel[torch.Tensor, torch.Tensor]:
+        def mask_tokens(self, inputs: torch.Tensor, special_token_mask:Optional[torch.Tensor] =None) -> Tuple[torch.Tensor, torch.Tensor]:
             inputs= inputs.clone()
             labels = labels.clone()
             
             probability_matrix = torch.full(labels.shape, self.mlm_probability)
             if special_token_mask is None:
                 special_tokens_mask = [
-                    self.tokenizer.get_special_tokens_mask(val, already_has_special_tokens = True) for val in labels in tolist()
+                    self.tokenizer.get_special_tokens_mask(val, already_has_special_tokens = True) for val in labels.tolist()
                 ]
 
                 special_tokens_mask = torch.tensor(special_tokens_mask, dtype = torch.bool)
@@ -455,12 +455,20 @@ def main():
             else:
                 special_tokens_mask = special_tokens_mask.bool()
             
-            probability_matrix.masked_fill_(special_tokens_mask).bool()
+
+
+            probability_matrix.masked_fill_(special_tokens_mask, value = 0.0)
+            masked_indices = torch.bernoulli(probability_matrix).bool()
             labels[~masked_indices] = -100
 
-            indices_replaced = torch.bernoulli(otrch.full(labels.shape, 0.5)).bool() & masked_indices & ~indices_replaced
+            indices_replaced = torch.bernoulli(torch.full(labels.shape, 0.5)).bool() & masked_indices & ~indices_replaced
             random_words = torch.randint(len(self.tokenizer), labels.shape, dtype = torch.long)
-            inputs[indices_random] = random_words[indices_rondom]
+            inputs[indices_replaced] = self.tokenizer.convert_tokens_to_ids(self.tokenizer.mask_tokens)
+            
+            indices_random = torch.bernoulli(torch.full(labels.shape, 0.5)).bool() &masked_indices & ~indices_replaced
+            random_words = torch.randint(len(self.tokenizer), labels.shape, dtype = torch.long)
+            
+            inputs[indices_random] = random_words[indices_random]
 
             return inputs, labels
         
@@ -486,7 +494,7 @@ def main():
         train_result = trainer.train(model_path = model_path)
         trainer.save_model()
 
-        output_train_file = os.path.join(trianing_args.output_dir, "train_results.txt")
+        output_train_file = os.path.join(training_args.output_dir, "train_results.txt")
         if trainer.is_world_process_zero():
             with open(output_train_file, 'w') as writer:
                 logger.info("******* Train results ****")
@@ -494,17 +502,17 @@ def main():
                     logger.info(f"  {key} = {value}")
                     writer.write(f'{key} = {value}\n')
 
-            trainer.state.save_to_json(os.path.join(trianing_args.output_dir, "trainer_state.json"))
+            trainer.state.save_to_json(os.path.join(training_args.output_dir, "trainer_state.json"))
 
     results = {}
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
         results = trainer.evaluate(eval_senteval_trainsfer=True)
 
-        ouput_eval_file = os.path.join(trianing_args.output_dir, "eval_results.txt")
+        ouput_eval_file = os.path.join(training_args.output_dir, "eval_results.txt")
 
         if trainer.is_world_process_zero():
-            with open(output_eval_file, 'w') as writer:
+            with open(training_args.output_eval_file, 'w') as writer:
                 logger.info("*** Eval results ***")    
                 for key ,value in sorted(results.items()):
                     logger.info(f" {key} = {value}")
