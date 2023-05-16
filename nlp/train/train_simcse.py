@@ -229,7 +229,7 @@ def main():
         model_args, data_args, training_args= parser.parse_args_into_dataclasses()
     
     if (
-        oa.path.exists(training_args.output_dir)
+        os.path.exists(training_args.output_dir)
         and os.listdir(training_args.output_dir)
         and training_args.do_trian
         and not training_args.overwrite_output_dir
@@ -416,7 +416,6 @@ def main():
             for feature in features:
                 for i in range(num_sent):
                     flat_features.append({k: features[k][i] if k in special_keys else feature[k] for k in feature})
-
             
             batch = self.tokenizer.pad(
                 flat_features,
@@ -521,7 +520,6 @@ def main():
 
 def _mp_fn(index):
     main()
-
 
 if __name__ == '__main__':
     main()
