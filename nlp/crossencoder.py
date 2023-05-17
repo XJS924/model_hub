@@ -74,7 +74,7 @@ class CrossEncoder():
             raise ValueError(f'unknown schedule {scheduler}')
 
     def fit(self,train_dataloader: DataLoader,
-            evaluateor,
+            evaluator,
             epochs: int=1,
             activation_fct=nn.Identity(),
             scheduler: str="WarmupLinear",
@@ -90,6 +90,7 @@ class CrossEncoder():
             callback: Callable[[float, int, int], None]= None,
             show_progress_bar: bool = True
             ):
+        
         train_dataloader.collate_fn = self.smart_batching_collate
 
         if use_amp:
@@ -121,7 +122,7 @@ class CrossEncoder():
             loss_fct = nn.BCEWithLogitsLoss() if self.config.num_labels==1 else nn.CrossEntropyLoss()
 
         skip_scheduler =  False
-        for epoch in tragnge(epochs, desc = 'Epoch', disbale= not show_process_bar):
+        for epoch in trange(epochs, desc = 'Epoch', disbale= not show_progress_bar):
             training_steps = 0
             self.model.zero_grad()
             self.model.train()
@@ -160,11 +161,11 @@ class CrossEncoder():
                 training_steps += 1
 
                 if evaluator is not None and evaluation_steps > 0 and training_steps % evaluation_steps == 0:
-                    self._eval_during_training(evaluateor, output_path, save_best_model, epoch, training_steps, callback)
+                    self._eval_during_training(evaluator, output_path, save_best_model, epoch, training_steps, callback)
                     self.model.zero_grad()
                     self.model.train()
             if evaluator is not None:
-                self._eval_during_training(evaluateor, output_path, save_best_model, epoch, -1, callback)
+                self._eval_during_training(evaluator, output_path, save_best_model, epoch, -1, callback)
 
     def _eval_during_training(self, evaluator, output_path, save_best_model, epoch, steps, callback):
         if evaluator is not None:

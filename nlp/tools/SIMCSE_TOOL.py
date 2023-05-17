@@ -263,7 +263,7 @@ if __name__=="__main__":
     simcse.build_index(example_sentences, use_faiss = False)
     results= simcse.search(example_queries)
 
-    for i, result in enumerate(example_queries):
+    for i, result in enumerate(results):
         print(f'Retrival results for query :{example_queries[i]}')
         for sentence, score in result:
             print(f' {sentence} (cosin similarity :{score:.4f})')

@@ -69,8 +69,8 @@ class Pooler(nn.Module):
             return NotImplementedError
         
 
-def cls_init(cls, config):
-    cls_pooler_type = cls.model_args.pooler_type
+def cl_init(cls, config):
+    cls.pooler_type = cls.model_args.pooler_type
     cls.pooler = Pooler(cls.model_args.pooler_type)
 
     if cls.model_args.pooler_type =='cls':
@@ -78,7 +78,7 @@ def cls_init(cls, config):
     cls.sim = Similarity(tmp = cls.model_args.temp)
     cls.init_weight()
 
-def cls_forward(cls,
+def cl_forward(cls,
                 encoder,
                 input_ids =None,
                 attention_mask = None, 
@@ -256,7 +256,7 @@ class BertForCL(BertPreTrainedModel):
         if self.model_args.do_mlm:
             self.lm_head = BertLMPredictionHead(config)
         
-        cls_init(self,config)
+        cl_init(self,config)
 
     def forward(self,
                 input_ids =None, 
@@ -286,7 +286,7 @@ class BertForCL(BertPreTrainedModel):
                                    return_dict = return_dict,
                                    )
         else:
-            return cls_forward(self,self.bert,
+            return cl_forward(self,self.bert,
                                input_ids=input_ids,
                                attention_mask=attention_mask,
                                token_type_ids=token_type_ids,
@@ -311,7 +311,7 @@ class RobertaForCL(RobertaPreTrainedModel):
         if self.model_args.do_mlm:
             self.lm_head = RobertaLMHead(config)
         
-        cls_init(self,config)
+        cl_init(self,config)
 
     def forward(self,
                 input_ids =None, 
@@ -341,7 +341,7 @@ class RobertaForCL(RobertaPreTrainedModel):
                                    return_dict = return_dict,
                                    )
         else:
-            return cls_forward(self,self.roberta,
+            return cl_forward(self,self.roberta,
                                input_ids=input_ids,
                                attention_mask=attention_mask,
                                token_type_ids=token_type_ids,
