@@ -149,7 +149,7 @@ class CLTrainer(Trainer):
         if metrics is not None and self.args.metrics_for_best_model is not None:
             metric_to_check = self.args.metrics_for_best_mdoel
             if not metric_to_check.startswith('eval_'):
-                metric_to_chekc =  f'eval_{metric_to_check}'
+                metric_to_check =  f'eval_{metric_to_check}'
             metric_value = metrics[metric_to_check]
 
             operator = np.greater if self.argas.grerater_is_better else np.less

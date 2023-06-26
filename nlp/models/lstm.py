@@ -7,7 +7,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 class LSTM(nn.module):
 
     def __init__(self, word_embedding_dimension: int ,
@@ -32,7 +31,7 @@ class LSTM(nn.module):
         token_embeddings  = features['token_emebddings']
         sentence_lengths = torch.clamp(features['sentence_lenghts'], min= 1)
 
-        apcked = nn.utils.rnn.pack_padded_sequence(token_embeddings, sentence_lengths, batch_first=True, enforce_sorted = False)
+        packed = nn.utils.rnn.pack_padded_sequence(token_embeddings, sentence_lengths, batch_first=True, enforce_sorted = False)
         packed =  self.encoder(packed)
         unpack = nn.utils.rnn.pad_packed_sequence(packed[0], batch_first =  True)[0]
         features.update({"token_embeddings": unpack})
