@@ -33,40 +33,40 @@ class CNN(nn.module):
                              padding=padding_size)
             self.convs.append(conv)
 
-        def foreward(self, features):
-            token_embeddings = features['token_embeddings']
+    def forward(self, features):
+        token_embeddings = features['token_embeddings']
 
-            token_embeddings = token_embeddings.transpose(1, -1)
-            vectors = [conv(token_embeddings) for conv in self.convs]
-            out = torch.cat(vectors,1).transpose(1,-1)
+        token_embeddings = token_embeddings.transpose(1, -1)
+        vectors = [conv(token_embeddings) for conv in self.convs]
+        out = torch.cat(vectors,1).transpose(1,-1)
 
-            features.update({'token_embeddings': out})
-            return features
+        features.update({'token_embeddings': out})
+        return features
 
-        def get_word_embedding_dimension(self) -> int:
-            return self.embeddings_dimension
+    def get_word_embedding_dimension(self) -> int:
+        return self.embeddings_dimension
+    
+    def tokenizer(self, text: str) -> List[int]:
+        raise NotImplementedError()
+    
+    def save(self, output_path:str):
+        with open(os.path.join(output_path, 'cnn_config.json'), 'w') as fOut:
+            json.dump(self.get_config_dict(), fOut, indent = 2)
         
-        def tokenizer(self, text: str) -> List[int]:
-            raise NotImplementedError()
-        
-        def save(self, output_path:str):
-            with open(os.path.join(output_path, 'cnn_config.json'), 'w') as fOut:
-                json.dump(self.get_config_dict(), fOut, indent = 2)
-            
-            torch.save(self.state_dict(), os.path.join(output_path, 'pytorch_model.bin'))
+        torch.save(self.state_dict(), os.path.join(output_path, 'pytorch_model.bin'))
 
-        def get_config_dict(self,):
-            return {key: self.__dict__[key] for key in self.congig_keys}
-        
-        @staticmethod
-        def load(input_path: str):
-            with open(os.path.join(input_path, 'cnn_config.json'), 'r') as fIn:
-                config = json.load(fIn)
+    def get_config_dict(self,):
+        return {key: self.__dict__[key] for key in self.congig_keys}
+    
+    @staticmethod
+    def load(input_path: str):
+        with open(os.path.join(input_path, 'cnn_config.json'), 'r') as fIn:
+            config = json.load(fIn)
 
-                weights= torch.load(os.path.join(input_path, 'pytorch_model.bin'), map_location = torch.device('cpu'))
-                model = CNN(**config)
-                model.load_state_dict(weights)
-                return model
+            weights= torch.load(os.path.join(input_path, 'pytorch_model.bin'), map_location = torch.device('cpu'))
+            model = CNN(**config)
+            model.load_state_dict(weights)
+            return model
             
 
 
