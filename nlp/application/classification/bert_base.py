@@ -46,7 +46,7 @@ class MyDataset(Dataset):
 def collate_fn(features):
     text=[line[0] for line in features]
     label=[line[1] for line in features]
-    tokenized = tokenizer(text,padding=True,return_tensors='pt')
+    tokenized = tokenizer(text, padding=True,return_tensors='pt')
     input_ids = tokenized['input_ids']
     attention_mask = tokenized['attention_mask']
     labels = torch.tensor(label)

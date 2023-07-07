@@ -11,18 +11,15 @@ from tqdm import tqdm
 import time
 
 set_seed(42)
-model_name="bert-base-chinese"
-num_labels=10
-
-
+model_path="bert-base-chinese"
+tokenizer = BertTokenizer.from_pretrained(model_path)
 
 class Model(nn.Module):
-
     def __init__(self, model_path):
         super(Model,self).__init__()
         self.config = BertConfig.from_pretrained(model_path)
-        self.tokenizer = BertTokenizer.from_pretrained(model_name)
-        self.model = BertModel.from_pretrained(model_name, config = self.config)
+        # self.tokenizer = BertTokenizer.from_pretrained(model_path)
+        self.model = BertModel.from_pretrained(model_path, config = self.config)
         
     def forward(self, input_ids, attention_mask, pooler_type = 'cls'):
         output = self.model(input_ids, attention_mask, output_hidden_states=True)
@@ -115,6 +112,7 @@ training_args=TrainingArguments(output_dir='./weights',
                                     save_total_limit=1
                                )
 
+model =  Model(model_path)
 trainer = Trainer(model=model,
                   args=training_args,
                   train_dataset=train,
